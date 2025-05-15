@@ -10,11 +10,12 @@ function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [theme, setTheme] = useState('dark');
-  const [selectedFile, setSelectedFile] = useState(null); // New state for selected file
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [currentModel, setCurrentModel] = useState('gemini'); // Add state for current model
   const dropdownRef = useRef(null);
   const wsRef = useRef(null);
   const chatContainerRef = useRef(null);
-  const fileInputRef = useRef(null); // New ref for file input
+  const fileInputRef = useRef(null);
   const clientId = '123';
 
   // Load conversation history from local storage on mount
@@ -25,8 +26,10 @@ function Home() {
 
   // Initialize WebSocket connection
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:8000/ws/${clientId}`);
+    // Connect to the appropriate endpoint based on the current model
+    const ws = new WebSocket(`ws://localhost:8000/ws/${currentModel}/${clientId}`);
     wsRef.current = ws;
+
 
     // Accumulate chunks and manage streaming
     let accumulatedResponse = '';
@@ -37,8 +40,6 @@ function Home() {
     // Clean response
     const cleanResponse = (text) => {
       return text
-        .replace(/TOOL_CALL::.*?}/g, '') // Remove TOOL_CALL and its content
-        .replace(/TOOL_CALL/g, '') // Remove standalone TOOL_CALL
         .replace(/(\*\*|`{1,3}|\n{2,})/g, '') // Remove Markdown
         .replace(/Let me (fetch|check|help|explain).*?\./gi, '') // Remove boilerplate
         .replace(/Let me know if.*$/gi, '')
@@ -138,7 +139,7 @@ function Home() {
     };
 
     ws.onopen = () => {
-      console.log(`Connected to ws://localhost:8000/ws/${clientId}`);
+      console.log(`Connected to ws://localhost:8000/ws/${currentModel}/${clientId}`);
     };
 
     ws.onmessage = (event) => {
@@ -232,7 +233,8 @@ function Home() {
         wsRef.current.close();
       }
     };
-  }, [clientId]);
+  }, [clientId, currentModel]); // Add currentModel as a dependency
+
 
   // Handle clicks outside dropdown to close it
   useEffect(() => {
@@ -327,7 +329,7 @@ function Home() {
       JSON.stringify({
         type: 'user_message',
         payload: input,
-        model: 'openai',
+        model: currentModel, // Use the current model
       })
     );
 
@@ -412,17 +414,17 @@ function Home() {
   };
 
   const handleDropdownOption = (option) => {
-    consolemu
     console.log(`${option} clicked`);
     setIsDropdownOpen(false);
-    if (wsRef.current) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'connect_model',
-          payload: option,
-        })
-      );
+
+    // Update the model based on the selected option
+    if (option === 'Connect with Open AI') {
+      setCurrentModel('openai');
+    } else if (option === 'Connect with Gemini') {
+      setCurrentModel('gemini');
     }
+
+    // The WebSocket will reconnect automatically due to the useEffect dependency
   };
 
   const toggleTheme = () => {
@@ -600,18 +602,20 @@ function Home() {
                         <FaPlus className="w-4 h-4" />
                       </button>
                       {isDropdownOpen && (
-                        <div className={`absolute bottom-12 left-0 w-48 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} rounded-lg z-10`}>
+                         <div className={`absolute bottom-12 left-0 w-48 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} rounded-lg z-10`}>
                           <button
                             onClick={() => handleDropdownOption('Connect with Open AI')}
-                            className={`w-full text-left px-3 py-2 ${theme === 'dark' ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-800 hover:bg-gray-300'} rounded-t-lg transition-colors duration-200`}
+                            className={`w-full text-left px-3 py-2 ${theme === 'dark' ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-800 hover:bg-gray-300'} ${currentModel === 'openai' ? 'font-bold' : ''} rounded-t-lg transition-colors duration-200`}
                           >
-                            Connect with Open AI
+
+                            Connect with Open AI {currentModel === 'openai' && '✓'}
+
                           </button>
                           <button
                             onClick={() => handleDropdownOption('Connect with Gemini')}
-                            className={`w-full text-left px-3 py-2 ${theme === 'dark' ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-800 hover:bg-gray-300'} rounded-b-lg transition-colors duration-200`}
+                            className={`w-full text-left px-3 py-2 ${theme === 'dark' ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-800 hover:bg-gray-300'} ${currentModel === 'gemini' ? 'font-bold' : ''} rounded-b-lg transition-colors duration-200`}
                           >
-                            Connect with Gemini
+                            Connect with Gemini {currentModel === 'gemini' && '✓'}
                           </button>
                         </div>
                       )}
